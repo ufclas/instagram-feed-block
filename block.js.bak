@@ -1,0 +1,56 @@
+(function () {
+    var el = wp.element.createElement;
+    var registerBlockType = wp.blocks.registerBlockType;
+    var TextControl = wp.components.TextControl;
+    var ServerSideRender = wp.serverSideRender;
+
+    registerBlockType('instagram-feed-block/instagram-block', {
+        title: 'Instagram Feed',
+        icon: 'format-gallery',
+        category: 'common',
+        attributes: {
+            accessToken: {
+                type: 'string',
+                default: '',
+            },
+            limit: {
+                type: 'number',
+                default: 10,
+            },
+        },
+        edit: function (props) {
+            var attributes = props.attributes;
+
+            function onChangeAccessToken(newAccessToken) {
+                props.setAttributes({ accessToken: newAccessToken });
+            }
+
+            function onChangeLimit(newLimit) {
+                props.setAttributes({ limit: newLimit });
+            }
+
+            return el(
+                'div',
+                null,
+                el(TextControl, {
+                    label: 'Access Token',
+                    value: attributes.accessToken,
+                    onChange: onChangeAccessToken,
+                }),
+                el(TextControl, {
+                    label: 'Limit',
+                    type: 'number',
+                    value: attributes.limit,
+                    onChange: onChangeLimit,
+                }),
+                el(ServerSideRender, {
+                    block: 'instagram-feed-block/instagram-block',
+                    attributes: attributes,
+                })
+            );
+        },
+        save: function () {
+            return null;
+        },
+    });
+})();

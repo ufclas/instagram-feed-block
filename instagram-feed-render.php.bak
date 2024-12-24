@@ -1,0 +1,73 @@
+<?php
+function render_instagram_feed_block($attributes) {
+	
+    $access_token = $attributes['accessToken'];
+    $limit = $attributes['limit'];
+
+    // Perform Instagram API request and render the feed here.
+    // You'll need to implement the logic to fetch and display Instagram posts.
+	$output = '<section class="social-media-shell"><div class="social-media-shell-wrapper"><div class="social-feed row">';
+	$instagram_access_token = get_option('instagram_token');
+	$feed_limit = get_option('instagram_username');
+	
+    try {
+			$socialText = '';
+			$socialImg = '';
+			$socialLink = '';
+			$i = 1;
+
+			$ch1 = curl_init();
+			curl_setopt($ch1, CURLOPT_URL, 'https://graph.instagram.com/me/media?fields=id,media_type,media_url,thumbnail_url,timestamp,permalink,caption&access_token='.$access_token.'&limit='.$limit);
+			curl_setopt($ch1, CURLOPT_RETURNTRANSFER, true);
+			curl_setopt($ch1, CURLOPT_CONNECTTIMEOUT, 20);
+			
+			$mh = curl_multi_init();
+			curl_multi_add_handle($mh,$ch1);
+			
+			$error = false;
+			do {
+				$status = curl_multi_exec($mh, $active);
+				if ($active) {
+					curl_multi_select($mh);
+				}
+
+			} while ($active && $status == CURLM_OK);
+
+			curl_multi_remove_handle($mh, $ch1);
+			
+			curl_multi_close($mh);
+
+
+			$response_1 = curl_multi_getcontent($ch1);
+			if(!empty($response_1)){
+			//supdate_post_meta();
+			$json1 = json_decode($response_1);
+			//$content.= '<pre>'.print_r($json1).'</pre>';
+			foreach ($json1->data as $data) {
+				if($data->media_type == 'IMAGE' || $data->media_type == 'CAROUSEL_ALBUM'){
+					$media = $data->media_url;
+				}
+				else{
+					$media = $data->thumbnail_url;
+				}
+				
+				$output.= '<div class="col-xl-3 col-md-6 col-12 soc-container">	<a href="'.$data->permalink.'" target="_blank"
+                            class="social-item m-insta social-overlay" style="background-image: url('.$media.'); ">
+					<span class="social-text">'.$data->caption.'<span class="social-icon"><img src="'.get_stylesheet_directory_uri().'/img/icon-instagram.png" alt="Instagram Icon"></span></span>
+					</a>
+
+                        </div>';
+			}
+		}
+	}
+    catch (Exception $e) {
+        $output .= '<span>'.strval($e).'</span>';
+    }
+	$output .= '</div></div></section>';
+    //$output = '<p>This is where your Instagram feed will be displayed.</p>';
+
+    return $output;
+}
+register_block_type('instagram-feed-block/instagram-block', array(
+    'render_callback' => 'render_instagram_feed_block',
+));

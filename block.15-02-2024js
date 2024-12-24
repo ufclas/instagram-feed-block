@@ -1,0 +1,255 @@
+(function () {
+    var el = wp.element.createElement;
+    var registerBlockType = wp.blocks.registerBlockType;
+    var InspectorControls = wp.editor.InspectorControls;
+    var TextControl = wp.components.TextControl;
+    var RichText = wp.editor.RichText;
+	  
+    registerBlockType('instagram-feed-block/instagram-block', {
+        title: 'Instagram Feed',
+        icon: 'format-gallery',
+        category: 'common',
+        attributes: {
+            accessToken: {
+                type: 'string',
+                default: '',
+            },
+            limit: {
+                type: 'number',
+                default: 4,
+            },
+            previewContent: {
+                type: 'string',
+                source: 'html',
+                selector: '.instagram-preview-content',
+            },
+            sectionHeading: {
+                type: 'string',
+                default: '',
+            },
+            fburl: {
+                type: 'string',
+                default: '#',
+            },
+            twitterurl: {
+                type: 'string',
+                default: '#',
+            },
+            instagramurl: {
+                type: 'string',
+                default: '#',
+            },
+            youtubeurl: {
+                type: 'string',
+                default: '#',
+            },
+        },
+        edit: function (props) {
+            var attributes = props.attributes;
+
+            function onChangeAccessToken(newAccessToken) {
+                props.setAttributes({ accessToken: newAccessToken });
+            }
+
+            function onChangeLimit(newLimit) {
+                props.setAttributes({ limit: parseInt(newLimit) || 4 });
+
+                // Update previewContent on limit change.
+                updatePreviewContent();
+            }
+
+            function onChangeSectionHeading(newValue) {
+                props.setAttributes({ sectionHeading: newValue });
+            }
+
+            function onChangeFacebookUrl(newValue) {
+                props.setAttributes({ fburl: newValue });
+            }
+
+            function onChangeTwitterUrl(newValue) {
+                props.setAttributes({ twitterurl: newValue });
+            }
+
+            function onChangeInstagramUrl(newValue) {
+                props.setAttributes({ instagramurl: newValue });
+            }
+
+            function onChangeYoutubeUrl(newValue) {
+                props.setAttributes({ youtubeurl: newValue });
+            }
+
+            // Function to update previewContent based on API call result.
+            function updatePreviewContent() {
+                // Make the API call to get the result.
+                fetchInstagramPosts(attributes.accessToken, attributes.limit, attributes)
+                    .then((result) => {
+                        props.setAttributes({ previewContent: result });
+                    })
+                    .catch((error) => {
+                        console.error('Error fetching Instagram posts:', error);
+                        // Handle errors gracefully if needed.
+                    });
+            }
+
+            // Initial update of previewContent when the block is loaded.
+            updatePreviewContent();
+
+            return [
+                el(InspectorControls, { key: 'inspector' },
+                    el('div', { className: 'instagram-settings' },
+                        el(TextControl, {
+                            label: 'Access Token',
+                            value: attributes.accessToken,
+                            onChange: onChangeAccessToken,
+                        }),
+                        el(TextControl, {
+                            label: 'Limit',
+                            type: 'number',
+                            value: attributes.limit,
+                            onChange: onChangeLimit,
+                        }),
+                        el(TextControl, {
+                            label: 'Section Heading',
+                            value: attributes.sectionHeading,
+                            onChange: onChangeSectionHeading,
+                        }),
+                        el(TextControl, {
+                            label: 'Facebook Page Url',
+                            value: attributes.fburl,
+                            onChange: onChangeFacebookUrl,
+                        }),
+                        el(TextControl, {
+                            label: 'Twitter Page Url',
+                            value: attributes.twitterurl,
+                            onChange: onChangeTwitterUrl,
+                        }),
+                        el(TextControl, {
+                            label: 'Instagram Page Url',
+                            value: attributes.instagramurl,
+                            onChange: onChangeInstagramUrl,
+                        }),
+                        el(TextControl, {
+                            label: 'Youtube Page Url',
+                            value: attributes.youtubeurl,
+                            onChange: onChangeYoutubeUrl,
+                        })
+                    )
+                ),
+                el('div', { className: 'instagram-preview' },
+                    el(RichText, {
+                        tagName: 'div',
+                        //value: attributes.previewContent,
+						dangerouslySetInnerHTML: { __html: attributes.previewContent },
+
+                        className: 'instagram-preview-content',
+                        onChange: function (newContent) {
+                            props.setAttributes({ previewContent: newContent });
+                        },
+                    })
+                ),
+            ];
+        },
+        save: function () {
+            return null;
+        },
+    });
+
+    // Function to fetch Instagram posts.
+    function fetchInstagramPosts(accessToken, limit, attributes) {
+        const api_url = `https://graph.instagram.com/v12.0/me/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp&access_token=${accessToken}&limit=${limit}`;
+
+        return fetch(api_url)
+            .then(response => {
+                if (!response.ok) {
+                    console.error('Network response was not ok:', response);
+                    throw new Error(`Network response was not ok. Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.data) {
+                    return generateHtml(data.data, attributes);  // Pass attributes here
+                } else {
+                    console.error('No data found in Instagram response:', data);
+                    return '<p>No Instagram posts found.</p>';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching Instagram posts:', error);
+                return `<p>Error fetching Instagram posts. Please check your access token and try again. ${error.message}</p>`;
+            });
+    }
+
+    // Function to generate HTML from Instagram posts data.
+   function generateHtml(posts, attributes) {
+    let html = '<section class="social-media-shell"><div class="social-media-shell-wrapper"><p class="social-media-shell-title">' + attributes.sectionHeading + '</p><div class="social-feed row">';
+
+    posts.forEach(post => {
+        const caption = post.caption ? post.caption : '';
+        const media = (post.media_type === 'IMAGE' || post.media_type === 'CAROUSEL_ALBUM') ? escUrl(post.media_url) : escUrl(post.thumbnail_url);
+
+        html += `<div class="col-xl-3 col-md-6 col-12 soc-container">
+            <a href="${escUrl(post.permalink)}" target="_blank" class="social-item m-insta social-overlay" style="background-image: url(${media});">
+                <span class="social-text">${caption}<span class="social-icon"><img src="/wp-content/themes/ufl-main-uni/img/icon-instagram.png" alt="Instagram Icon"></span></span>
+            </a>
+        </div>`;
+    });
+
+    html += '</div>';
+    html += '<!-- START SOCIAL FEED ICON COL -->';
+    html += '<div class="col-12 social-column social-column-blue justify-content-center mt-5">';
+
+
+html += '<div class="col-12 social-column social-column-blue justify-content-center mt-5">';
+    
+    // Facebook Icon
+    html += `<a href="${attributes.fburl}" target="_blank" class="facebook-icon" rel="noopener">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512" class="ufl-brands ufl-facebook">
+            <path fill="currentColor" d="M279.14 288l14.22-92.66h-88.91v-60.13c0-25.35 12.42-50.06 52.24-50.06h40.42V6.26S260.43 0 225.36 0c-73.22 0-121.08 44.38-121.08 124.72v70.62H22.89V288h81.39v224h100.17V288z"/>
+        </svg>
+        <span class="visually-hidden">Facebook Icon</span>
+    </a>`;
+
+    // Twitter Icon
+    html += `<a href="${attributes.twitterurl}" target="_blank" class="twitter-icon" rel="noopener">
+        <svg viewBox="0 0 1200 1227" fill="none" xmlns="http://www.w3.org/2000/svg" class="ufl-brands ufl-twitter">
+            <path d="M714.163 519.284L1160.89 0H1055.03L667.137 450.887L357.328 0H0L468.492 681.821L0 1226.37H105.866L515.491 750.218L842.672 1226.37H1200L714.137 519.284H714.163ZM569.165 687.828L521.697 619.934L144.011 79.6944H306.615L611.412 515.685L658.88 583.579L1055.08 1150.3H892.476L569.165 687.854V687.828Z" fill="currentColor"/>
+        </svg>
+        <span class="visually-hidden">Twitter Icon</span>
+    </a>`;
+
+    // Instagram Icon
+    html += `<a href="${attributes.instagramurl}" target="_blank" class="instagram-icon" rel="noopener">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" class="ufl-brands ufl-instagram">
+            <path fill="currentColor"  d="M224.1 141c-63.6 0-114.9 51.3-114.9 114.9s51.3 114.9 114.9 114.9S339 319.5 339 255.9 287.7 141 224.1 141zm0 189.6c-41.1 0-74.7-33.5-74.7-74.7s33.5-74.7 74.7-74.7 74.7 33.5 74.7 74.7-33.6 74.7-74.7 74.7zm146.4-194.3c0 14.9-12 26.8-26.8 26.8-14.9 0-26.8-12-26.8-26.8s12-26.8 26.8-26.8 26.8 12 26.8 26.8zm76.1 27.2c-1.7-35.9-9.9-67.7-36.2-93.9-26.2-26.2-58-34.4-93.9-36.2-37-2.1-147.9-2.1-184.9 0-35.8 1.7-67.6 9.9-93.9 36.1s-34.4 58-36.2 93.9c-2.1 37-2.1 147.9 0 184.9 1.7 35.9 9.9 67.7 36.2 93.9s58 34.4 93.9 36.2c37 2.1 147.9 2.1 184.9 0 35.9-1.7 67.7-9.9 93.9-36.2 26.2-26.2 34.4-58 36.2-93.9 2.1-37 2.1-147.8 0-184.8zM398.8 388c-7.8 19.6-22.9 34.7-42.6 42.6-29.5 11.7-99.5 9-132.1 9s-102.7 2.6-132.1-9c-19.6-7.8-34.7-22.9-42.6-42.6-11.7-29.5-9-99.5-9-132.1s-2.6-102.7 9-132.1c7.8-19.6 22.9-34.7 42.6-42.6 29.5-11.7 99.5-9 132.1-9s102.7-2.6 132.1 9c19.6 7.8 34.7 22.9 42.6 42.6 11.7 29.5 9 99.5 9 132.1s2.7 102.7-9 132.1z"/>
+        </svg>
+        <span class="visually-hidden">Instagram Icon</span>
+    </a>`;
+
+    // Youtube Icon
+    html += `<a href="${attributes.youtubeurl}" target="_blank" class="youtube-icon" rel="noopener">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512" class="ufl-brands ufl-youtube">
+            <path fill="currentColor"  d="M549.655 124.083c-6.281-23.65-24.787-42.276-48.284-48.597C458.781 64 288 64 288 64S117.22 64 74.629 75.486c-23.497 6.322-42.003 24.947-48.284 48.597-11.412 42.867-11.412 132.305-11.412 132.305s0 89.438 11.412 132.305c6.281 23.65 24.787 41.5 48.284 47.821C117.22 448 288 448 288 448s170.78 0 213.371-11.486c23.497-6.321 42.003-24.171 48.284-47.821 11.412-42.867 11.412-132.305 11.412-132.305s0-89.438-11.412-132.305zm-317.51 213.508V175.185l142.739 81.205-142.739 81.201z"/>
+        </svg>
+        <span class="visually-hidden">Youtube Icon</span>
+    </a>`;
+
+
+
+    html += '</div>';
+    html += '</div></section>';
+
+    return html;
+}
+
+
+    // Function to escape HTML entities.
+    function escHtml(html) {
+        return wp.element.RawHTML('<span>' + html + '</span>').toString();
+    }
+
+    // Function to escape URL.
+    function escUrl(url) {
+        return wp.url.addQueryArgs({ href: url }).href;
+    }
+})();
