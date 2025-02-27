@@ -2,8 +2,8 @@
 /**
  * Plugin Name: Instagram Feed Block
  * Description: A Gutenberg block to fetch and display Instagram posts.
- * Version: 0.1.0
- * Author: The WordPress Contributors
+ * Version: 1.0
+ * Author: Your Name
  */
 
 if (!defined('ABSPATH')) {
